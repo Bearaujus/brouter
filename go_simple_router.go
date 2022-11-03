@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func NewGoSimpleRouter() Router {
+func NewRouter() Router {
 	var chiRouter = chi.NewRouter()
 	chiRouter.MethodNotAllowed(http.NotFound)
 	chiRouter.Use(middleware.Logger)
@@ -18,9 +18,9 @@ func NewGoSimpleRouter() Router {
 	}
 }
 
-func NewGoSimpleRouterWithParam(chiRouter *chi.Mux) Router {
+func NewRouterWithParam(chiRouter *chi.Mux) Router {
 	if chiRouter == nil {
-		return NewGoSimpleRouter()
+		return NewRouter()
 	}
 
 	return &router{

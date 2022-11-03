@@ -15,7 +15,7 @@ type DefaultResponseHeader struct {
 	Reason    string `json:"reason,omitempty"`
 }
 
-func DefaultErrorWriter(w http.ResponseWriter, r *http.Request, err error) {
+func DefaultErrorFunc(w http.ResponseWriter, r *http.Request, err error) {
 	var errorMessage string
 	if err != nil {
 		errorMessage = err.Error()
@@ -37,7 +37,7 @@ func DefaultErrorWriter(w http.ResponseWriter, r *http.Request, err error) {
 	_, _ = w.Write(payload)
 }
 
-func DefaultSuccessWriter(w http.ResponseWriter, r *http.Request, data interface{}) {
+func DefaultSuccessFunc(w http.ResponseWriter, r *http.Request, data interface{}) {
 	resp := &DefaultResponse{
 		Header: DefaultResponseHeader{
 			IsSuccess: true,

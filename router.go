@@ -11,8 +11,8 @@ import (
 )
 
 type Router interface {
-	Route(pattern string, methods []string, handlerFunc func(w http.ResponseWriter, r *http.Request) (interface{}, error), errorHandler func(w http.ResponseWriter, r *http.Request, err error), successHandler func(w http.ResponseWriter, r *http.Request, data interface{}))
-	RouteFileServer(pattern string, fileServerDirPath string) error
+	Route(sr *StructRoute)
+	RouteFileServer(srfs *StructRouteFileServer) error
 	Serve(host string, port int) error
 }
 
@@ -22,53 +22,63 @@ type router struct {
 	fileServerPatterns []string
 }
 
-func (r *router) Route(pattern string, methods []string, handlerFunc func(w http.ResponseWriter, r *http.Request) (interface{}, error), errorWriter func(w http.ResponseWriter, r *http.Request, err error), successWriter func(w http.ResponseWriter, r *http.Request, data interface{})) {
+func (r *router) Route(sr *StructRoute) {
+	// validate route data
+	if sr == nil {
+		return
+	}
+
 	// for each method
-	for _, method := range methods {
+	for _, method := range sr.Methods {
 		// setup handler
-		h := handler{
-			Func: handlerFunc,
+		var h handler
+		if sr.HandlerFunc != nil {
+			h.Func = sr.HandlerFunc
 		}
-		if errorWriter != nil {
-			h.ErrorWriter = errorWriter
+		if sr.HandlerErrorFunc != nil {
+			h.ErrorFunc = sr.HandlerErrorFunc
 		}
-		if successWriter != nil {
-			h.SuccessWriter = successWriter
+		if sr.HandlerSuccessFunc != nil {
+			h.SuccessFunc = sr.HandlerSuccessFunc
 		}
 
 		// add route data
 		r.routes = append(r.routes, route{
+			pattern: sr.Pattern,
 			method:  method,
-			pattern: pattern,
 			handler: h,
 		})
 	}
 }
 
-func (r *router) RouteFileServer(pattern string, fileServerDirPath string) error {
+func (r *router) RouteFileServer(srfs *StructRouteFileServer) error {
+	// validate route data
+	if srfs == nil {
+		return errors.New("nil route file server")
+	}
+
 	// validate pattern
-	if strings.ContainsAny(pattern, "{}*") {
+	if strings.ContainsAny(srfs.Pattern, "{}*") {
 		return errors.New("file server does not permit any url parameters")
 	}
 
 	// map pattern
-	if pattern != "/" && pattern[len(pattern)-1] != '/' {
-		r.router.Get(pattern, http.RedirectHandler(pattern+"/", http.StatusTemporaryRedirect).ServeHTTP)
-		pattern += "/"
+	if srfs.Pattern != "/" && srfs.Pattern[len(srfs.Pattern)-1] != '/' {
+		r.router.Get(srfs.Pattern, http.RedirectHandler(srfs.Pattern+"/", http.StatusTemporaryRedirect).ServeHTTP)
+		srfs.Pattern += "/"
 	}
-	rawPattern := pattern
-	pattern += "*"
+	rawPattern := srfs.Pattern
+	srfs.Pattern += "*"
 
 	fsHandler := func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(http.Dir(fileServerDirPath)))
+		pathPrefix := strings.TrimSuffix(chi.RouteContext(r.Context()).RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(http.Dir(srfs.DirPath)))
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fs.ServeHTTP(w, r)
 	}
 
 	// add files pattern to router
-	r.router.Get(pattern, fsHandler)
+	r.router.Get(srfs.Pattern, fsHandler)
 	r.fileServerPatterns = append(r.fileServerPatterns, rawPattern)
 
 	return nil
@@ -79,11 +89,11 @@ func (r *router) Serve(host string, port int) error {
 	routesMap := map[string][]string{}
 	for i := range r.routes {
 		selectedRoute := r.routes[i]
-		if selectedRoute.handler.ErrorWriter == nil {
-			selectedRoute.handler.ErrorWriter = DefaultErrorWriter
+		if selectedRoute.handler.ErrorFunc == nil {
+			selectedRoute.handler.ErrorFunc = DefaultErrorFunc
 		}
-		if selectedRoute.handler.SuccessWriter == nil {
-			selectedRoute.handler.SuccessWriter = DefaultSuccessWriter
+		if selectedRoute.handler.SuccessFunc == nil {
+			selectedRoute.handler.SuccessFunc = DefaultSuccessFunc
 		}
 		r.router.Method(selectedRoute.method, selectedRoute.pattern, selectedRoute.handler)
 		routesMap[selectedRoute.pattern] = append(routesMap[selectedRoute.pattern], selectedRoute.method)
@@ -107,8 +117,9 @@ func (r *router) Serve(host string, port int) error {
 	}
 
 	// serve http
-	logrus.Info("-----------------------------------------")
+	logrus.Info("-------------------------------------------------------")
 	logrus.Infof("service running at http://%v\n", address)
+	logrus.Info("-------------------------------------------------------")
 	if err := http.Serve(listener, r.router); err != nil {
 		return err
 	}
