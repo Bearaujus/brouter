@@ -1,4 +1,4 @@
-package go_simple_router
+package brouter
 
 import (
 	"github.com/go-chi/chi"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func NewRouter() Router {
+func NewBRouter() Router {
 	var chiRouter = chi.NewRouter()
 	chiRouter.MethodNotAllowed(http.NotFound)
 	chiRouter.Use(middleware.Logger)
@@ -18,9 +18,9 @@ func NewRouter() Router {
 	}
 }
 
-func NewRouterWithParam(chiRouter *chi.Mux) Router {
+func NewBRouterWithParam(chiRouter *chi.Mux) Router {
 	if chiRouter == nil {
-		return NewRouter()
+		return NewBRouter()
 	}
 
 	return &router{

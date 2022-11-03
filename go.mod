@@ -1,4 +1,4 @@
-module github.com/Bearaujus/go-simple-router
+module github.com/Bearaujus/brouter
 
 go 1.19
 

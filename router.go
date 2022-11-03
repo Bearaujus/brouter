@@ -1,4 +1,4 @@
-package go_simple_router
+package brouter
 
 import (
 	"errors"
