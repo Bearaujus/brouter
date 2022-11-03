@@ -2,27 +2,32 @@ package go_simple_router
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
-type DefaultResponse struct {
-	Header DefaultResponseHeader `json:"header"`
+type defaultResponse struct {
+	Header defaultResponseHeader `json:"header"`
 	Data   interface{}           `json:"data"`
 }
 
-type DefaultResponseHeader struct {
+type defaultResponseHeader struct {
 	IsSuccess bool   `json:"is_success"`
 	Reason    string `json:"reason,omitempty"`
 }
 
-func DefaultErrorFunc(w http.ResponseWriter, r *http.Request, err error) {
+func defaultHandlerFunc(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	return nil, errors.New("nil handler")
+}
+
+func defaultHandlerErrorFunc(w http.ResponseWriter, r *http.Request, err error) {
 	var errorMessage string
 	if err != nil {
 		errorMessage = err.Error()
 	}
 
-	resp := &DefaultResponse{
-		Header: DefaultResponseHeader{
+	resp := &defaultResponse{
+		Header: defaultResponseHeader{
 			IsSuccess: false,
 			Reason:    errorMessage,
 		},
@@ -37,9 +42,9 @@ func DefaultErrorFunc(w http.ResponseWriter, r *http.Request, err error) {
 	_, _ = w.Write(payload)
 }
 
-func DefaultSuccessFunc(w http.ResponseWriter, r *http.Request, data interface{}) {
-	resp := &DefaultResponse{
-		Header: DefaultResponseHeader{
+func defaultHandlerSuccessFunc(w http.ResponseWriter, r *http.Request, data interface{}) {
+	resp := &defaultResponse{
+		Header: defaultResponseHeader{
 			IsSuccess: true,
 		},
 		Data: data,

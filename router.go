@@ -89,11 +89,14 @@ func (r *router) Serve(host string, port int) error {
 	routesMap := map[string][]string{}
 	for i := range r.routes {
 		selectedRoute := r.routes[i]
+		if selectedRoute.handler.Func == nil {
+			selectedRoute.handler.Func = defaultHandlerFunc
+		}
 		if selectedRoute.handler.ErrorFunc == nil {
-			selectedRoute.handler.ErrorFunc = DefaultErrorFunc
+			selectedRoute.handler.ErrorFunc = defaultHandlerErrorFunc
 		}
 		if selectedRoute.handler.SuccessFunc == nil {
-			selectedRoute.handler.SuccessFunc = DefaultSuccessFunc
+			selectedRoute.handler.SuccessFunc = defaultHandlerSuccessFunc
 		}
 		r.router.Method(selectedRoute.method, selectedRoute.pattern, selectedRoute.handler)
 		routesMap[selectedRoute.pattern] = append(routesMap[selectedRoute.pattern], selectedRoute.method)
