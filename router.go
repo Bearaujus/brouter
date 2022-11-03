@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi"
-	"github.com/sirupsen/logrus"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"net"
 	"net/http"
+	"os"
+	"sort"
 	"strings"
 )
 
@@ -95,6 +97,11 @@ func (r *router) RoutesFileServer(structRoutesFileServer []StructRouteFileServer
 }
 
 func (r *router) Serve(host string, port int) error {
+	// init table writer
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"ROUTE", "METHOD"})
+
 	// map routes
 	routesMap := map[string][]string{}
 	for i := range r.routes {
@@ -121,18 +128,21 @@ func (r *router) Serve(host string, port int) error {
 
 	// log routes
 	for k, v := range routesMap {
-		logrus.Infof("route: %v http://%v%v", v, address, k)
+		sort.Slice(v, func(i, j int) bool {
+			return v[i] < v[j]
+		})
+		t.AppendRow(table.Row{k, v}, table.RowConfig{})
 	}
 
 	// log file server
 	for _, fsPattern := range r.fileServerPatterns {
-		logrus.Infof("route-fs: http://%v%v\n", address, fsPattern)
+		t.AppendRow(table.Row{fsPattern, []string{http.MethodGet}}, table.RowConfig{})
 	}
 
 	// serve http
-	logrus.Info("-------------------------------------------------------")
-	logrus.Infof("service running at http://%v\n", address)
-	logrus.Info("-------------------------------------------------------")
+	t.SortBy([]table.SortBy{{Number: 1, Mode: table.Asc}})
+	t.Render()
+	fmt.Printf("> service running at %v\n", address)
 	if err := http.Serve(listener, r.router); err != nil {
 		return err
 	}
