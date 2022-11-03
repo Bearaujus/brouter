@@ -11,8 +11,10 @@ import (
 )
 
 type Router interface {
-	Route(sr *StructRoute)
-	RouteFileServer(srfs *StructRouteFileServer) error
+	Route(structRoute StructRoute)
+	Routes(structRoutes []StructRoute)
+	RouteFileServer(structRouteFileServer StructRouteFileServer) error
+	RoutesFileServer(structRoutesFileServer []StructRouteFileServer) error
 	Serve(host string, port int) error
 }
 
@@ -22,64 +24,72 @@ type router struct {
 	fileServerPatterns []string
 }
 
-func (r *router) Route(sr *StructRoute) {
-	// validate route data
-	if sr == nil {
-		return
-	}
-
+func (r *router) Route(structRoute StructRoute) {
 	// for each method
-	for _, method := range sr.Methods {
+	for _, method := range structRoute.Methods {
 		// setup handler
 		var h handler
-		if sr.HandlerFunc != nil {
-			h.Func = sr.HandlerFunc
+		if structRoute.HandlerFunc != nil {
+			h.Func = structRoute.HandlerFunc
 		}
-		if sr.HandlerErrorFunc != nil {
-			h.ErrorFunc = sr.HandlerErrorFunc
+		if structRoute.HandlerErrorFunc != nil {
+			h.ErrorFunc = structRoute.HandlerErrorFunc
 		}
-		if sr.HandlerSuccessFunc != nil {
-			h.SuccessFunc = sr.HandlerSuccessFunc
+		if structRoute.HandlerSuccessFunc != nil {
+			h.SuccessFunc = structRoute.HandlerSuccessFunc
 		}
 
 		// add route data
 		r.routes = append(r.routes, route{
-			pattern: sr.Pattern,
+			pattern: structRoute.Pattern,
 			method:  method,
 			handler: h,
 		})
 	}
 }
 
-func (r *router) RouteFileServer(srfs *StructRouteFileServer) error {
-	// validate route data
-	if srfs == nil {
-		return errors.New("nil route file server")
+func (r *router) Routes(structRoutes []StructRoute) {
+	// for each struct route
+	for _, structRoute := range structRoutes {
+		r.Route(structRoute)
 	}
+}
 
+func (r *router) RouteFileServer(structRouteFileServer StructRouteFileServer) error {
 	// validate pattern
-	if strings.ContainsAny(srfs.Pattern, "{}*") {
+	if strings.ContainsAny(structRouteFileServer.Pattern, "{}*") {
 		return errors.New("file server does not permit any url parameters")
 	}
 
 	// map pattern
-	if srfs.Pattern != "/" && srfs.Pattern[len(srfs.Pattern)-1] != '/' {
-		r.router.Get(srfs.Pattern, http.RedirectHandler(srfs.Pattern+"/", http.StatusTemporaryRedirect).ServeHTTP)
-		srfs.Pattern += "/"
+	if structRouteFileServer.Pattern != "/" && structRouteFileServer.Pattern[len(structRouteFileServer.Pattern)-1] != '/' {
+		r.router.Get(structRouteFileServer.Pattern, http.RedirectHandler(structRouteFileServer.Pattern+"/", http.StatusTemporaryRedirect).ServeHTTP)
+		structRouteFileServer.Pattern += "/"
 	}
-	rawPattern := srfs.Pattern
-	srfs.Pattern += "*"
+	rawPattern := structRouteFileServer.Pattern
+	structRouteFileServer.Pattern += "*"
 
 	fsHandler := func(w http.ResponseWriter, r *http.Request) {
 		pathPrefix := strings.TrimSuffix(chi.RouteContext(r.Context()).RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(http.Dir(srfs.DirPath)))
+		fs := http.StripPrefix(pathPrefix, http.FileServer(http.Dir(structRouteFileServer.DirPath)))
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		fs.ServeHTTP(w, r)
 	}
 
 	// add files pattern to router
-	r.router.Get(srfs.Pattern, fsHandler)
+	r.router.Get(structRouteFileServer.Pattern, fsHandler)
 	r.fileServerPatterns = append(r.fileServerPatterns, rawPattern)
+
+	return nil
+}
+
+func (r *router) RoutesFileServer(structRoutesFileServer []StructRouteFileServer) error {
+	// for each struct route file server
+	for _, structRouteFileServer := range structRoutesFileServer {
+		if err := r.RouteFileServer(structRouteFileServer); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
